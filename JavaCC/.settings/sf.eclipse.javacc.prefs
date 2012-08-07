@@ -1,0 +1,8 @@
+CLEAR_CONSOLE=false
+JJ_NATURE=true
+JTB_OPTIONS=-p\=parser
+RUNTIME_JAR=C\:/Program Files (x86)/eclipse/plugins/sf.eclipse.javacc_1.5.16/javacc.jar
+RUNTIME_JTBJAR=C\:/Program Files (x86)/eclipse/plugins/sf.eclipse.javacc_1.5.16/jtb132.jar
+SHOW_CONSOLE=true
+SUPPRESS_WARNINGS=true
+eclipse.preferences.version=1

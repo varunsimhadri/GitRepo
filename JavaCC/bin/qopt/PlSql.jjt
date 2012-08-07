@@ -1,0 +1,663 @@
+/** A grammar for Oracle's PL/SQL.
+
+HISTORY:
+    30-JUL-2006 John Kristian <jkristian@netflix.com>
+        Upgraded to PL/SQL for Oracle 9.2.
+        Added code to gather table and procedure names.
+        This version doesn't support the entire PL/SQL language,
+        merely the subset that's used with my database.
+
+    07-APR-1997 Ramanathan .S <sramji@rocketmail.com>
+         grammar for PLSQL inside Oracle*Forms 4.5 (i.e. PlSql 1.x)
+*/
+
+options{
+    STATIC=false ;
+    IGNORE_CASE=true ;
+//  DEBUG_LOOKAHEAD= true ;
+	MULTI=true;
+    NODE_DEFAULT_VOID=true;
+    NODE_PREFIX="";
+    NODE_USES_PARSER=true;
+}
+
+PARSER_BEGIN(PlSql)
+package qopt;
+
+import java.io.Reader;
+import java.io.FileInputStream;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.Iterator;
+
+
+
+
+
+class PlSql {
+
+public class MultiplyOp extends SimpleNode {
+  private int op;
+	public MultiplyOp(int id) {
+    super(id);
+  }
+
+  public MultiplyOp(PlSql p, int id) {
+    super(p, id);
+  }
+
+  public void setOper(int x){
+	  op =x;
+  }
+   
+  public int getOper(){
+	  return op;
+  }
+}
+
+public class SimpleOp extends SimpleNode {
+	private int op;
+	public SimpleOp(int id) {
+    super(id);
+  }
+
+  public SimpleOp(PlSql p, int id) {
+    super(p, id);
+  }
+  
+  public void setOper(int x){
+	  op =x;
+  }
+  
+  public int getOper(){
+	  return op;
+  }
+
+}
+
+public class UnaryExp extends SimpleNode {
+	private int sign;
+	public UnaryExp(int id) {
+    super(id);
+  }
+
+  public UnaryExp(PlSql p, int id) {
+    super(p, id);
+  }
+
+  public void setSign(int x){
+	  sign =x;
+  }
+  
+  public int getSign(){
+	  return sign;
+  }
+}
+
+    /** Parse PL/SQL from files.  Each arg is expected to be the name of a file,
+        or "-" to indicate System.in.
+     */
+    public static void main( String args[] ) throws Throwable {
+        if (args.length < 1) {
+            args = new String[] {"-"};
+        }
+        for (int a = 0; a < args.length; ++a) {
+            final String input = args[a];
+            final PlSql parser = new PlSql("-".equals(input) ? System.in : new FileInputStream(input));
+            try {
+                SimpleNode rootNode = parser.CompilationUnit();
+                rootNode.dump("t");
+            } catch(Throwable t) {
+            	System.err.println(input + ":1: not parsed");
+            	t.printStackTrace();
+            }
+            Iterator  it = parser.tables.iterator();
+            System.out.println(it.next() + " tables in " + input);
+        }
+    }
+
+    public Set<String> functions = new HashSet<String>();
+    public Set<String> procedures = new HashSet<String>();
+    public Set<String> tables = new HashSet<String>();
+
+    public void reInit(Reader input) {
+        ReInit(input);
+        functions.clear();
+        procedures.clear();
+        tables.clear();
+    }
+
+    private String lastObjectReference = null;
+
+    protected boolean seeTYPE() {
+        return "TYPE".equalsIgnoreCase(getToken(1).image);
+    }
+
+}
+PARSER_END(PlSql)
+
+
+SKIP:
+{
+    " "
+|   "\t"
+|   "\r"
+|   "\n"
+}
+
+/* Prefix      Meaning
+    -------------------
+    K_          Keyword
+    O_          Operator
+    S_          Substitutes
+*/
+
+TOKEN: /* SQL and PLSQL Keywords. prefixed with K_ to avoid name clashes */
+{
+    <K_ALL: "ALL">
+|   <K_ALTER: "ALTER">
+|   <K_AND: "AND">
+|   <K_ANY: "ANY">
+|   <K_AS: "AS">
+|   <K_ASC:"ASC">
+|   <K_BEGIN: "BEGIN">
+|   <K_BETWEEN:"BETWEEN">
+|   <K_BINARY_INTEGER: "BINARY_INTEGER">
+|   <K_BOOLEAN:"BOOLEAN">
+|   <K_BY:"BY">
+|   <K_CALL:"CALL">
+|   <K_CASE:"CASE">
+|   <K_CAST:"CAST">
+|   <K_CHAR:"CHAR">
+|   <K_CLOSE:"CLOSE">
+|   <K_COMMENT:"COMMENT">
+|   <K_COMMIT:"COMMIT">
+|   <K_COMMITTED:"COMMITTED">
+|   <K_CONNECT:"CONNECT">
+|   <K_CONSTANT:"CONSTANT">
+|   <K_CONSTRAINT:"CONSTRAINT">
+|   <K_CONSTRAINTS:"CONSTRAINTS">
+| 	<K_CREATE:"CREATE">
+|   <K_CURRENT:"CURRENT">
+|   <K_CURSOR:"CURSOR">
+|   <K_DATE:"DATE">
+|   <K_DECIMAL:"DECIMAL">
+|   <K_DECLARE:"DECLARE">
+|   <K_DEFAULT:"DEFAULT">
+|   <K_DELETE:"DELETE">
+|   <K_DESC:"DESC">
+|   <K_DISTINCT:"DISTINCT">
+|   <K_DO:"DO">
+|   <K_ELSE:"ELSE">
+|   <K_ELSIF:"ELSIF">
+|   <K_END:"END">
+|   <K_ESCAPE:"ESCAPE">
+|   <K_EXCEPTION:"EXCEPTION">
+|   <K_EXCEPTION_INIT:"EXCEPTION_INIT">
+|   <K_EXCLUSIVE:"EXCLUSIVE">
+|   <K_EXISTS:"EXISTS">
+|   <K_EXIT:"EXIT">
+|   <K_FETCH:"FETCH">
+|   <K_FLOAT:"FLOAT">
+|   <K_FOR:"FOR">
+|   <K_FORALL:"FORALL">
+|   <K_FROM:"FROM">
+|   <K_FULL:"FULL">
+|   <K_FUNCTION:"FUNCTION">
+|   <K_GOTO:"GOTO">
+|   <K_GROUP:"GROUP">
+|   <K_HAVING:"HAVING">
+|   <K_IF:"IF">
+|   <K_IN:"IN">
+|   <K_INDEX:"INDEX">
+|   <K_INNER:"INNER">
+|   <K_INSERT:"INSERT">
+|   <K_INTEGER:"INTEGER">
+|   <K_INTERSECT:"INTERSECT">
+|   <K_INTO:"INTO">
+|   <K_IS:"IS">
+|   <K_ISOLATION:"ISOLATION">
+|   <K_LEFT:"LEFT">
+|   <K_LIKE:"LIKE">
+|   <K_LOCK:"LOCK">
+|   <K_LOOP:"LOOP">
+|   <K_MERGE:"MERGE">
+|   <K_MINUS:"MINUS">
+|   <K_NATURAL:"NATURAL">
+|   <K_NOT:"NOT">
+|   <K_NOWAIT:"NOWAIT">
+|   <K_NULL:"NULL">
+|   <K_NULLS:"NULLS">
+|   <K_NUMBER:"NUMBER">
+|   <K_OF:"OF">
+|   <K_ON:"ON">
+|   <K_ONLY:"ONLY">
+|   <K_OPEN:"OPEN">
+|   <K_OR:"OR">
+|   <K_ORDER:"ORDER">
+|   <K_OUT:"OUT">
+|   <K_OVER:"OVER">
+|   <K_PACKAGE:"PACKAGE">
+|   <K_PARTITION:"PARTITION">
+|   <K_POSITIVE:"POSITIVE">
+|   <K_PRAGMA:"PRAGMA">
+|   <K_PRIOR:"PRIOR">
+|   <K_PROCEDURE:"PROCEDURE">
+|   <K_PX_GRANULE:"PX_GRANULE">
+|   <K_RAISE:"RAISE">
+|   <K_RANGE:"RANGE">
+|   <K_READ:"READ">
+|   <K_REAL:"REAL">
+|   <K_RECORD:"RECORD">
+|   <K_REF:"REF">
+|   <K_RETURN:"RETURN">
+| 	<K_RETURNS:"RETURNS">
+|   <K_RETURNING:"RETURNING">
+|   <K_REVERSE:"REVERSE">
+|   <K_RIGHT:"RIGHT">
+|   <K_ROLLBACK:"ROLLBACK">
+|   <K_ROW:"ROW">
+|   <K_ROWS:"ROWS">
+|   <K_SAMPLE:"SAMPLE">
+|   <K_SAVEPOINT:"SAVEPOINT">
+|   <K_SELECT:"SELECT">
+|   <K_SERIALIZABLE:"SERIALIZABLE">
+|   <K_SET:"SET">
+|   <K_SHARE:"SHARE">
+|   <K_SIBLINGS:"SIBLINGS">
+|   <K_SKIP:"SKIP">
+|   <K_SMALLINT:"SMALLINT">
+|   <K_SQL:"SQL">
+|   <K_START:"START">
+|   <K_TABLE:"TABLE">
+|   <K_TEST:"TEST">
+|   <K_THEN:"THEN">
+|   <K_TO:"TO">
+|   <K_TRANSACTION:"TRANSACTION">
+|   <K_UNION:"UNION">
+|   <K_UNIQUE:"UNIQUE">
+|   <K_UPDATE:"UPDATE">
+|   <K_USE:"USE">
+|   <K_USING:"USING">
+|   <K_VALUES:"VALUES">
+|   <K_VARCHAR2:"VARCHAR2">
+|   <K_VARCHAR:"VARCHAR">
+|   <K_WAIT:"WAIT">
+|   <K_WHEN:"WHEN">
+|   <K_WHERE:"WHERE">
+|   <K_WHILE:"WHILE">
+|   <K_WITH:"WITH">
+|   <K_WORK:"WORK">
+|   <K_WRITE:"WRITE">
+}
+
+TOKEN : /* Numeric Constants */
+{
+	< S_NUMBER: <FLOAT>
+	    | <FLOAT> ( ["e","E"] ([ "-","+"])? <FLOAT> )?
+    	>
+  | 	< #FLOAT: <INTEGER>
+	    | <INTEGER> ( "." <INTEGER> )?
+	    | "." <INTEGER>
+    	>
+  | 	< #INTEGER: ( <DIGIT> )+ >
+  | 	< #DIGIT: ["0" - "9"] >
+}
+
+SPECIAL_TOKEN:
+{
+   <LINE_COMMENT: "--"(~["\r","\n"])*>
+|  <MULTI_LINE_COMMENT: "/*" (~["*"])* "*" ("*" | (~["*","/"] (~["*"])* "*"))* "/">
+}
+
+
+TOKEN:
+{
+    < S_IDENTIFIER: (<LETTER>)+ (<DIGIT> | <LETTER> |<SPECIAL_CHARS>)* >
+  | < #LETTER: ["a"-"z", "A"-"Z"] >
+  | < #SPECIAL_CHARS: "$" | "_" | "#">
+  | < S_BIND: ":" ( <S_NUMBER> | <S_IDENTIFIER> ("." <S_IDENTIFIER>)?) >
+  | < S_CHAR_LITERAL: "'" (~["'"])* "'" ("'" (~["'"])* "'")*>
+  | < S_QUOTED_IDENTIFIER: "\"" (~["\n","\r","\""])* "\"" >
+}
+
+/* Represents a PLSQL code block. */
+SimpleNode CompilationUnit() #Root: /**************************/
+{}
+{
+  QueryStatement() { return jjtThis; }
+}
+
+void QueryStatement() #void:/**************************/
+{}
+{
+    SelectStatement()
+    ";"
+}
+
+void SelectStatement():
+{}
+{
+    SelectWithoutOrder() 
+    [ OrderByClause() ]
+   // [ ForUpdateClause() ]
+    //[ "SKIP" ID("LOCKED") ]
+}
+
+void SelectWithoutOrder():
+{}
+{
+    SelectSet() ((("UNION" ["ALL"]) | "INTERSECT" | "MINUS") SelectSet())*
+}
+
+void SelectSet():
+{}
+{
+    Select() | "(" SubQuery() ")"
+}
+
+void Select() #Sel:
+{}
+{
+    "SELECT" [ "ALL" | "DISTINCT" | "UNIQUE" ] SelectList() #Proj
+    //[IntoClause()]
+    FromClause() #From
+    [ WhereClause() #where]
+    [ HavingClause() GroupByClause() | GroupByClause() [ HavingClause() ]]
+}
+
+/* Checks for whatever follows  SELECT */
+void SelectList():
+{}
+{
+    "*" | SelectItem() ("," SelectItem())*
+}
+
+void SelectItem():
+{}
+{
+    (
+        LOOKAHEAD(2) OracleObjectName()".*" // table.*
+      | LOOKAHEAD(4) OracleObjectName()"." OracleObjectName() ".*" // schema.table.*
+      | SQLSimpleExpression() // column name or expression
+    )
+    [ [ "AS" ] SelectItemAlias()]
+}
+
+void SelectItemAlias():
+{}
+{
+    OracleObjectName()
+    // Some keywords are acceptable as aliases:
+  | "RETURNING" | "WHEN"
+}
+
+void SubQuery():/**************************/
+{}
+{
+    SelectStatement()  	 
+}
+
+void FromClause():
+{}
+{
+    "FROM" TableReference() ( "," TableReference())*
+}
+
+void WhereClause():
+{}
+{
+    "WHERE" SQLExpression()
+}
+
+void GroupByClause():
+{}
+{
+    "GROUP" "BY" SQLExpressionList()
+}
+
+void HavingClause():
+{}
+{
+    "HAVING" SQLExpression()
+}
+
+void OrderByClause():
+{}
+{
+    "ORDER" ["SIBLINGS"] "BY" OrderByExpression() ("," OrderByExpression())*
+}
+
+void OrderByExpression():
+{}
+{
+    SQLSimpleExpression()
+    ["ASC" | "DESC"]
+    //["NULLS" ID("LAST")]
+}
+
+String OracleObjectName():/********************/
+{}
+{
+    <S_IDENTIFIER>        {return token.image;}
+  | <S_QUOTED_IDENTIFIER> {String s = token.image; return s.substring(1, s.length() - 1);}
+}
+
+void TableReference():
+{}
+{
+    "ONLY" "(" QueryTableExpression() ")"
+  | QueryTableExpression()
+}
+
+String ObjectReference():
+{
+    String s;
+    StringBuilder name = new StringBuilder();
+}
+{
+    s=OracleObjectName()       {name.append(s);}
+    [ "." s=OracleObjectName() {name.append(".").append(s);}
+    [ "." s=OracleObjectName() {name.append(".").append(s);}
+    ]]
+    //[ "@" ("!" | s=TNSName()   {name.append("@").append(s);} )] // remote reference
+    // The @! idiom is undocumented, but accepted by Oracle software.
+    {return lastObjectReference = name.toString();}
+}
+
+void TableName():/**************************/
+{
+    String s;
+    StringBuilder name = new StringBuilder();
+}
+{
+    // schema.table@link
+    s=OracleObjectName()       {name.append(s);tables.add(name.toString().toUpperCase());}
+    //[ "." s=OracleObjectName() {name.append(".").append(s);} ]
+    //[ "@" s=TNSName()          {name.append("@").append(s);} ]
+    
+}
+
+
+void QueryTableExpression():
+{}
+{
+    (	TableName() // might also be a query name
+     //| TableCollectionExpression()
+   	|  LOOKAHEAD(3) "(" SubQuery() ")"
+     | "(" TableReference() ")"
+     //| BindVariable() // not valid SQL, but appears in StatsPack SQL text
+    )
+    //["PX_GRANULE" "(" <S_NUMBER> "," <S_IDENTIFIER> "," <S_IDENTIFIER> ")"]
+   // ["SAMPLE" [ID("BLOCK")] "(" <S_NUMBER> ")"]
+    [OracleObjectName()] // alias
+    //(Join())*
+    
+}
+
+void SQLSimpleExpression() #SimpleExp:
+{}
+{  
+    SQLMultiplicativeExpression() ( SimpleOp() SQLMultiplicativeExpression() )*
+}
+
+void SimpleOp() #SimpleOp:
+{Token t;}
+{
+	t = "+" {jjtThis.setOper(0);} | t = "-" {jjtThis.setOper(1);} | t =  "||" {jjtThis.setOper(2);}
+	
+}
+
+void SQLMultiplicativeExpression() #MultiplyExp:
+{}
+{
+    SQLExponentExpression() ( MultiplyOp() SQLExponentExpression())*
+}
+
+void MultiplyOp() #MultiplyOp:
+{Token t;}
+{
+	t = "*" {jjtThis.setOper(3);} | t = "/" {jjtThis.setOper(4);}
+	
+}
+
+void SQLExponentExpression() #ExpoExp:
+{}
+{
+    SQLUnaryExpression() ( ExpoOp() SQLUnaryExpression())*
+}
+
+void ExpoOp() #MultiplyOp:
+{Token t;}
+{
+	t = "**" {jjtThis.setOper(5);} 
+	
+}
+
+void SQLUnaryExpression() #UnaryExp:
+{}
+{
+    ["+" {jjtThis.setSign(0);}| "-" {jjtThis.setSign(1);}] SQLPrimaryExpression()
+}
+
+
+void SQLPrimaryExpression() #PrimExp:
+{}
+{
+    <S_NUMBER>
+  | <S_CHAR_LITERAL>
+  | "NULL"
+  //| SQLCaseExpression()
+  | "(" (LOOKAHEAD(3) SelectStatement() | SQLExpression()) ")"
+  /*| BindVariable()
+  | LOOKAHEAD(2) SQLCastExpression()
+  | LOOKAHEAD(IntervalExpression()) IntervalExpression()
+  | LOOKAHEAD(OuterJoinExpression()) OuterJoinExpression()
+  | LOOKAHEAD(FunctionReference() "(") FunctionCall()*/
+  | TableColumn()  // Might be a call to a parameter-less function.
+}
+
+void TableColumn():
+{}
+{
+    ObjectReference()
+}
+
+void SQLExpression():
+{}
+{
+    SQLAndExpression() ("OR" SQLAndExpression())*
+}
+
+void SQLAndExpression():
+{}
+{
+    SQLUnaryLogicalExpression() ( "AND" SQLUnaryLogicalExpression())*
+}
+
+void SQLUnaryLogicalExpression():
+{}
+{
+    LOOKAHEAD(2) ExistsClause()
+  | (["NOT"] SQLRelationalExpression())
+}
+
+void ExistsClause():
+{}
+{
+    ["NOT"] "EXISTS" "(" SubQuery() ")"
+}
+
+void SQLRelationalExpression():
+{}
+{
+    /* Only after looking past "(", Expression() and "," we will know that
+       it is expression list */
+
+    (LOOKAHEAD("(" SQLSimpleExpression() ",")
+     "(" SQLExpressionList() ")"
+|
+    (["PRIOR"] SQLSimpleExpression()))
+
+    /* Lookahead(2) is required because of NOT IN,NOT BETWEEN and NOT LIKE */
+   ( SQLRelationalOperatorExpression() |  LOOKAHEAD(2) (SQLInClause())
+                                    |  LOOKAHEAD(2) (SQLBetweenClause())
+                                    |  LOOKAHEAD(2) (SQLLikeClause())
+                                   // |  IsNullClause()
+   )?
+}
+
+void SQLExpressionList():
+{}
+{
+    SQLExpression() ("," SQLExpression())*
+}
+
+void SQLRelationalOperatorExpression():
+{}
+{
+
+    Relop()
+
+    /* Only after seeing an ANY/ALL or "(" followed by a SubQuery() we can
+    determine that is is a sub-query
+    */
+    (   LOOKAHEAD("ANY" | "ALL" | "(" "SELECT")
+        (["ALL" | "ANY"] "(" SubQuery() ")")
+        |
+        ["PRIOR"] SQLSimpleExpression()
+    )
+}
+
+void Relop():/********************/
+{}
+{
+    "="
+  | "!" "="
+  | "#"
+  | LOOKAHEAD(2) ">" "="
+  | ">"
+  | LOOKAHEAD(2) "<" ">"
+  | LOOKAHEAD(2) "<" "="
+  | "<"
+}
+
+
+void SQLInClause():
+{}
+{
+    ["NOT"] "IN" "(" (LOOKAHEAD(3) SubQuery() | SQLExpressionList()) ")"
+}
+
+void SQLBetweenClause():
+{}
+{
+    ["NOT"] "BETWEEN" SQLSimpleExpression() "AND" SQLSimpleExpression()
+}
+
+void SQLLikeClause():
+{}
+{
+    ["NOT"] "LIKE" SQLSimpleExpression() ["ESCAPE" SQLSimpleExpression()]
+}
+
